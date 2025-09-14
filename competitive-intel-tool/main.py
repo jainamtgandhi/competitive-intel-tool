@@ -11,30 +11,147 @@ from datetime import datetime
 st.set_page_config(
     page_title="🧠 Personal CI Tool", 
     page_icon="🧠", 
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-# Sidebar for API keys
-with st.sidebar:
-    st.title("🧠 Personal CI Tool")
+# Custom CSS for full screen usage
+st.markdown("""
+<style>
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        max-width: 100%;
+    }
+    
+    .stApp {
+        margin: 0;
+        padding: 0;
+    }
+    
+    .stApp > header {
+        background-color: transparent;
+    }
+    
+    .stApp > div {
+        max-width: 100%;
+    }
+    
+    /* Make columns use more space */
+    .stColumn {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    /* Optimize form elements */
+    .stTextInput > div > div > input {
+        width: 100%;
+    }
+    
+    .stSelectbox > div > div > select {
+        width: 100%;
+    }
+    
+    /* Make tabs use full width */
+    .stTabs > div > div > div {
+        width: 100%;
+    }
+    
+    /* Optimize button spacing */
+    .stButton > button {
+        width: 100%;
+    }
+    
+    /* Make progress bars and status elements full width */
+    .stProgress > div > div > div {
+        width: 100%;
+    }
+    
+    /* Optimize markdown content */
+    .stMarkdown {
+        width: 100%;
+    }
+    
+    /* Make containers use full width */
+    .stContainer {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    /* Optimize tab content */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 1rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 3rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Make text areas and inputs use more space */
+    .stTextArea > div > div > textarea {
+        width: 100%;
+    }
+    
+    /* Optimize metric displays */
+    .metric-container {
+        width: 100%;
+    }
+    
+    /* Make expander content full width */
+    .streamlit-expanderContent {
+        width: 100%;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+def main():
+    st.title("🧠 Personal Competitive Intelligence Tool")
     st.caption("Your daily competitive intelligence assistant")
     
-    # API Key inputs
-    openai_api_key = st.text_input("OpenAI API Key", type="password")
-    serpapi_key = st.text_input("SerpAPI Key (250 free searches)", type="password", 
-                                value="ce79da0c5ca2cf7f2502748f3c5c9a3cf1204d920a83638073b81f7d70263028")
-    google_api_key = st.text_input("Google Search API Key (100/day free)", type="password",
-                                   value="AIzaSyA28027DgQk9f64vNpZrDpGIfwADn6kWoU")
-    google_cse_id = st.text_input("Google Custom Search Engine ID", type="password")
+    # API Configuration Section
+    st.subheader("🔑 API Configuration")
+    
+    col1, col2 = st.columns([1, 1], gap="medium")
+    
+    with col1:
+        openai_api_key = st.text_input("OpenAI API Key", type="password")
+        serpapi_key = st.text_input("SerpAPI Key (250 free searches)", type="password", 
+                                   value="ce79da0c5ca2cf7f2502748f3c5c9a3cf1204d920a83638073b81f7d70263028")
+    
+    with col2:
+        google_api_key = st.text_input("Google Search API Key (100/day free)", type="password",
+                                      value="AIzaSyA28027DgQk9f64vNpZrDpGIfwADn6kWoU")
+        google_cse_id = st.text_input("Google Custom Search Engine ID", type="password")
     
     # Analysis settings
     st.subheader("⚙️ Settings")
     analysis_depth = st.selectbox("Analysis Depth", ["Quick (2-3 min)", "Comprehensive (5-7 min)"])
     
-    # Set API keys
+    # Model selection
+    openai_model = st.selectbox(
+        "OpenAI Model", 
+        ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"],
+        help="gpt-3.5-turbo is recommended for free tier users"
+    )
+    
+    # Store model in session state
+    st.session_state['openai_model'] = openai_model
+    
+    # API Status indicators
     if openai_api_key:
-        openai.api_key = openai_api_key
         st.success("✅ OpenAI API Ready")
+        
+        # Show model info
+        if openai_model == "gpt-3.5-turbo":
+            st.info("💡 Using GPT-3.5 Turbo - Good for most analyses")
+        elif openai_model == "gpt-4":
+            st.info("🚀 Using GPT-4 - Premium model, requires paid access")
+        elif openai_model == "gpt-4-turbo":
+            st.info("⚡ Using GPT-4 Turbo - Latest model, requires paid access")
     
     if serpapi_key:
         st.success("✅ SerpAPI Ready (250 free searches)")
@@ -48,17 +165,37 @@ with st.sidebar:
     
     # Usage tracking
     st.subheader("📊 Usage Tracking")
-    st.caption("Monitor your free tier limits")
+    st.caption("Monitor your API limits and costs")
     
-    if st.button("🔄 Check API Usage"):
-        check_api_usage(serpapi_key, google_api_key)
-
-def main():
-    st.title("🧠 Personal Competitive Intelligence Tool")
-    st.caption("Enter a company name and URL to get comprehensive competitive analysis")
+    col1, col2 = st.columns([1, 1], gap="medium")
+    
+    with col1:
+        if st.button("🔄 Check API Usage"):
+            check_api_usage(serpapi_key, google_api_key)
+    
+    with col2:
+        if st.button("💰 Check OpenAI Quota"):
+            check_openai_quota(openai_api_key)
+    
+    # Show cost estimation
+    st.caption("**Estimated Cost per Analysis:**")
+    if openai_model == "gpt-3.5-turbo":
+        st.caption("~$0.02-0.05 (4 API calls × ~$0.005 each)")
+    elif openai_model == "gpt-4":
+        st.caption("~$0.20-0.50 (4 API calls × ~$0.05 each)")
+    elif openai_model == "gpt-4-turbo":
+        st.caption("~$0.10-0.25 (4 API calls × ~$0.03 each)")
+    
+    st.divider()
+    
+    # Store in session state
+    st.session_state['openai_api_key'] = openai_api_key
+    st.session_state['serpapi_key'] = serpapi_key
+    st.session_state['google_api_key'] = google_api_key
+    st.session_state['google_cse_id'] = google_cse_id
     
     # Input section
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1], gap="medium")
     
     with col1:
         company_name = st.text_input(
@@ -79,7 +216,7 @@ def main():
             return
         
         if not openai_api_key:
-            st.error("Please enter your OpenAI API key in the sidebar")
+            st.error("Please enter your OpenAI API key")
             return
         
         # Run analysis
@@ -127,6 +264,11 @@ def main():
 def discover_competitors(company_name):
     """Discover competitors using hybrid approach: Google Custom Search + SerpAPI"""
     competitors = []
+    
+    # Get API keys from session state
+    google_api_key = st.session_state.get('google_api_key')
+    google_cse_id = st.session_state.get('google_cse_id')
+    serpapi_key = st.session_state.get('serpapi_key')
     
     # Strategy: Use Google Custom Search first (free), then SerpAPI if needed
     
@@ -527,11 +669,13 @@ def analyze_with_gpt(company_name, company_data, competitor_data):
     
     try:
         # Run GPT analysis
+        api_key = st.session_state.get('openai_api_key')
+        model = st.session_state.get('openai_model', 'gpt-3.5-turbo')
         analyses = {
-            'overview': get_gpt_response(overview_prompt),
-            'pricing': get_gpt_response(pricing_prompt),
-            'features': get_gpt_response(feature_prompt),
-            'swot': get_gpt_response(swot_prompt)
+            'overview': get_gpt_response(overview_prompt, api_key, model),
+            'pricing': get_gpt_response(pricing_prompt, api_key, model),
+            'features': get_gpt_response(feature_prompt, api_key, model),
+            'swot': get_gpt_response(swot_prompt, api_key, model)
         }
         
         return analyses
@@ -539,18 +683,58 @@ def analyze_with_gpt(company_name, company_data, competitor_data):
     except Exception as e:
         return {"error": f"GPT analysis failed: {str(e)}"}
 
-def get_gpt_response(prompt):
-    """Get response from GPT-4"""
+def get_gpt_response(prompt, api_key=None, model=None):
+    """Get response from OpenAI model"""
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+        # Get API key from parameter or session state
+        if not api_key:
+            api_key = st.session_state.get('openai_api_key')
+        
+        if not api_key:
+            return "Error: OpenAI API key not provided"
+        
+        # Get model from parameter or session state
+        if not model:
+            model = st.session_state.get('openai_model', 'gpt-3.5-turbo')
+            
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=2000
         )
-        return response['choices'][0]['message']['content']
+        return response.choices[0].message.content
+    except openai.RateLimitError:
+        return """❌ **Rate Limit Exceeded**: You've hit your OpenAI API quota limit.
+
+**What this means:**
+- You've used up your available API credits
+- Your account may need billing information
+- You might have hit your monthly spending limit
+
+**How to fix:**
+1. Go to [platform.openai.com](https://platform.openai.com) → Billing
+2. Add a payment method and set a spending limit
+3. Check your usage dashboard for current quota status
+4. Consider upgrading your plan if needed
+
+**Alternative:** Wait for your quota to reset (usually monthly)"""
+    except openai.AuthenticationError:
+        return "❌ **Authentication Error**: Please check your OpenAI API key"
+    except openai.PermissionDeniedError:
+        return "❌ **Permission Denied**: Your API key doesn't have access to this model. Try switching to 'gpt-3.5-turbo'"
     except Exception as e:
-        return f"Error: {str(e)}"
+        error_str = str(e)
+        if "insufficient_quota" in error_str or "429" in error_str:
+            return """❌ **Quota Exceeded**: You've used up your OpenAI API credits.
+
+**Quick Fix:**
+1. Visit [OpenAI Platform](https://platform.openai.com/account/billing)
+2. Add billing information
+3. Set a monthly limit (e.g., $5-10)
+4. This will restore your API access immediately"""
+        return f"❌ **Error**: {error_str}"
 
 def prepare_content_for_analysis(company_name, company_data, competitor_data):
     """Prepare content for GPT analysis"""
@@ -580,10 +764,12 @@ def prepare_content_for_analysis(company_name, company_data, competitor_data):
 def display_comprehensive_results(company_name, analysis_results):
     """Display comprehensive analysis results"""
     
-    # Create tabs for different sections
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏢 Overview", "💰 Pricing", "⚡ Features", "🎯 SWOT", "📊 Export"
-    ])
+    # Use full width container
+    with st.container():
+        # Create tabs for different sections
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🏢 Overview", "💰 Pricing", "⚡ Features", "🎯 SWOT", "📊 Export"
+        ])
     
     with tab1:
         display_overview(company_name, analysis_results.get('overview', ''))
@@ -722,6 +908,48 @@ def check_api_usage(serpapi_key, google_api_key):
                 st.warning(f"⚠️ Google Search API: Status {response.status_code}")
         except Exception as e:
             st.warning(f"⚠️ Google Search API: Could not check - {e}")
+
+def check_openai_quota(api_key):
+    """Check OpenAI API quota and usage"""
+    if not api_key:
+        st.error("❌ No OpenAI API key provided")
+        return
+    
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Make a small test request to check quota
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Say 'quota check'"}],
+            max_tokens=5
+        )
+        
+        st.success("✅ OpenAI API: Active and quota available")
+        st.info("💡 For detailed usage, visit [OpenAI Platform](https://platform.openai.com/usage)")
+        
+    except openai.RateLimitError:
+        st.error("❌ **Rate Limit Exceeded**: You've hit your quota limit")
+        st.markdown("""
+        **Quick Fix:**
+        1. Go to [OpenAI Billing](https://platform.openai.com/account/billing)
+        2. Add a payment method
+        3. Set a monthly limit (e.g., $5-10)
+        """)
+    except openai.AuthenticationError:
+        st.error("❌ **Invalid API Key**: Please check your OpenAI API key")
+    except Exception as e:
+        error_str = str(e)
+        if "insufficient_quota" in error_str:
+            st.error("❌ **Quota Exceeded**: Add billing info to continue")
+            st.markdown("""
+            **How to fix:**
+            1. Visit [OpenAI Platform](https://platform.openai.com/account/billing)
+            2. Add billing information
+            3. Set spending limit
+            """)
+        else:
+            st.warning(f"⚠️ Could not check quota: {error_str}")
 
 if __name__ == "__main__":
     main()
