@@ -90,6 +90,9 @@ def main():
                 
                 competitor_data = scrape_competitors_comprehensive(competitors)
                 
+                # Add target company to competitor data for comprehensive comparison
+                competitor_data[company_name] = target_company_data
+                
                 # Step 5: Competitive Analysis
                 status_text.text("🤖 Running competitive analysis...")
                 progress_bar.progress(80)
@@ -100,7 +103,7 @@ def main():
                 status_text.text("📊 Generating competitive report...")
                 progress_bar.progress(100)
                 
-                display_competitive_research_results(company_name, competitive_analysis, competitors)
+                display_competitive_research_results(company_name, competitive_analysis, competitors, competitor_data)
                 
                 status_text.text("✅ Competitive research complete!")
                 
@@ -133,17 +136,21 @@ def extract_company_name_from_url(url):
         return "Unknown Company"
 
 def discover_competitors_comprehensive(company_name, company_url):
-    """Discover competitors using multiple search strategies"""
+    """Discover competitors using multiple search strategies with enhanced queries"""
     competitors = []
     
-    # Search queries for competitor discovery
+    # Enhanced search queries for better competitor discovery
     search_queries = [
         f'"{company_name}" competitors alternatives',
         f'"{company_name}" vs competitors comparison',
         f'best alternatives to {company_name}',
         f'companies like {company_name}',
         f'{company_name} competitors list',
-        f'{company_name} vs'
+        f'{company_name} vs',
+        f'{company_name} alternative software',
+        f'{company_name} similar companies',
+        f'"{company_name}" market competitors',
+        f'"{company_name}" industry rivals'
     ]
     
     # Try SerpAPI first (better results)
@@ -448,14 +455,25 @@ def extract_tier_price(element):
     return ""
 
 def scrape_competitors_comprehensive(competitors):
-    """Scrape competitor data"""
+    """Scrape competitor data with enhanced error handling and progress tracking"""
     competitor_data = {}
     
-    for competitor in competitors[:3]:  # Limit to top 3 competitors
+    # Increase limit to get more competitors for better comparison
+    for i, competitor in enumerate(competitors[:5]):  # Increased to top 5 competitors
         try:
-            data = scrape_company_comprehensive(competitor['url'], competitor['name'])
-            competitor_data[competitor['name']] = data
-        except:
+            with st.spinner(f"Scraping {competitor['name']}..."):
+                data = scrape_company_comprehensive(competitor['url'], competitor['name'])
+                competitor_data[competitor['name']] = data
+                st.success(f"✅ {competitor['name']} data collected")
+        except Exception as e:
+            st.warning(f"⚠️ Failed to scrape {competitor['name']}: {str(e)}")
+            # Add placeholder data so comparison still works
+            competitor_data[competitor['name']] = {
+                'homepage': {'title': competitor['name'], 'headline': 'Data unavailable', 'description': 'Could not scrape data'},
+                'pricing': None,
+                'features': None,
+                'about': None
+            }
             continue
     
     return competitor_data
@@ -472,16 +490,30 @@ def analyze_competitive_landscape(company_name, target_data, competitor_data):
     # Competitive Analysis Prompts
     analysis_prompts = {
         'overview': f"""
-        Analyze the competitive landscape for {company_name}:
+        Create a comprehensive competitive landscape analysis comparing {company_name} with all competitors:
         
+        TARGET COMPANY: {company_name}
+        COMPETITORS: {', '.join(competitor_names)}
         CONTENT: {content}
         
-        Provide:
-        1. What does {company_name} do?
-        2. Who are their main competitors?
-        3. What are the key differences between them?
-        4. What is the market positioning?
-        5. What are the competitive advantages/disadvantages?
+        **COMPETITIVE LANDSCAPE OVERVIEW:**
+        
+        1. **Market Analysis**: What is the overall market these companies operate in?
+        2. **Company Profiles**: Brief description of what each company does
+        3. **Competitive Positioning**: How does each company position itself differently?
+        4. **Key Differentiators**: What makes each company unique?
+        5. **Market Share Insights**: Which companies appear to be market leaders?
+        6. **Competitive Advantages**: What advantages does each company have?
+        7. **Strategic Recommendations**: What should {company_name} focus on to compete better?
+        
+        **SIDE-BY-SIDE COMPARISON:**
+        | Aspect | {company_name} | {', '.join(competitor_names)} |
+        |--------|----------------|{'-' * (len(competitor_names) * 15)}|
+        | Target Market | [Description] | [Description] |
+        | Value Proposition | [Description] | [Description] |
+        | Pricing Strategy | [Description] | [Description] |
+        | Key Features | [Description] | [Description] |
+        | Market Position | [Description] | [Description] |
         """,
         
         'structured_analysis': f"""
@@ -508,47 +540,94 @@ def analyze_competitive_landscape(company_name, target_data, competitor_data):
         """,
         
         'table_data': f"""
-        Create a structured table data for competitive analysis of {company_name}'s competitors:
+        Create a structured table data for competitive analysis including {company_name} and all competitors:
         
         TARGET COMPANY: {company_name}
         COMPETITORS: {', '.join(competitor_names)}
         
         CONTENT: {content}
         
-        For each COMPETITOR only (not the target company), provide a JSON object with these exact fields:
+        For EACH COMPANY (including {company_name} and all competitors), provide a JSON object with these exact fields:
         {{
-            "company_name": "Competitor Company Name",
+            "company_name": "Company Name",
             "target_persona": "Brief description of their target audience (1-2 sentences)",
             "market_positioning": "How they position themselves in the market (1-2 sentences)",
             "tone_messaging": "Messaging tone and style they use (1 sentence)",
-            "differentiation": "How they differentiate from {company_name} and other competitors (1-2 sentences)"
+            "differentiation": "How they differentiate from other companies in this space (1-2 sentences)"
         }}
         
-        Return as a JSON array with ONLY the competitors, not the target company.
+        Return as a JSON array with ALL companies (target + competitors).
         """,
         
         'pricing': f"""
-        Analyze pricing strategies in this competitive landscape:
+        Create a comprehensive pricing comparison table for this competitive landscape:
         
+        TARGET COMPANY: {company_name}
+        COMPETITORS: {', '.join(competitor_names)}
         CONTENT: {content}
         
-        Compare pricing models, tiers, and strategies across all companies.
+        For each company ({company_name} and {', '.join(competitor_names)}), provide:
+        
+        **PRICING COMPARISON TABLE:**
+        | Company | Pricing Tiers | Price Range | Billing Model | Target Market | Key Features |
+        |---------|---------------|-------------|---------------|---------------|--------------|
+        | [Company] | [Tier names] | [Price range] | [Monthly/Annual] | [Target audience] | [Key features] |
+        
+        **ANALYSIS:**
+        1. Pricing Strategy Comparison: How do pricing strategies differ?
+        2. Value Proposition: Which company offers best value for money?
+        3. Market Positioning: How do prices position each company in the market?
+        4. Competitive Advantages: What pricing advantages does each have?
         """,
         
         'features': f"""
-        Compare product features and capabilities:
+        Create a comprehensive feature comparison for this competitive landscape:
         
+        TARGET COMPANY: {company_name}
+        COMPETITORS: {', '.join(competitor_names)}
         CONTENT: {content}
         
-        Identify unique features, common features, and feature gaps.
+        **FEATURE COMPARISON TABLE:**
+        | Feature Category | {company_name} | {', '.join(competitor_names)} |
+        |------------------|----------------|{'-' * (len(competitor_names) * 15)}|
+        | Core Features | [Features] | [Features] |
+        | Integration | [Features] | [Features] |
+        | Target Market | [Features] | [Features] |
+        | Unique Features | [Features] | [Features] |
+        
+        **ANALYSIS:**
+        1. Feature Gaps: What features does each competitor have that others don't?
+        2. Common Features: What features are standard across all competitors?
+        3. Unique Differentiators: What makes each company unique?
+        4. Feature Quality: Which company has the most comprehensive feature set?
         """,
         
         'swot': f"""
-        Perform competitive SWOT analysis:
+        Perform comprehensive competitive SWOT analysis for all companies:
         
+        TARGET COMPANY: {company_name}
+        COMPETITORS: {', '.join(competitor_names)}
         CONTENT: {content}
         
-        Rate each company's strengths, weaknesses, opportunities, and threats (1-5 scale).
+        **COMPETITIVE SWOT MATRIX:**
+        
+        For each company ({company_name} and {', '.join(competitor_names)}), provide:
+        
+        **{company_name}:**
+        - **Strengths (1-5)**: [List with ratings and evidence]
+        - **Weaknesses (1-5)**: [List with ratings and evidence]
+        - **Opportunities (1-5)**: [List with ratings and evidence]
+        - **Threats (1-5)**: [List with ratings and evidence]
+        
+        **COMPETITORS:**
+        [Repeat for each competitor]
+        
+        **COMPARATIVE ANALYSIS:**
+        1. **Market Leader**: Which company has the strongest overall position?
+        2. **Biggest Threats**: Which company poses the greatest threat to others?
+        3. **Growth Potential**: Which company has the best opportunities?
+        4. **Vulnerabilities**: Which company has the most weaknesses?
+        5. **Strategic Recommendations**: What should each company focus on?
         """
     }
     
@@ -597,8 +676,8 @@ def prepare_competitive_content(company_name, target_data, competitor_data):
     
     return content
 
-def display_competitive_research_results(company_name, analysis_results, competitors):
-    """Display competitive research results"""
+def display_competitive_research_results(company_name, analysis_results, competitors, competitor_data):
+    """Display competitive research results with full competitor data"""
     
     # Create tabs for different sections
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -606,31 +685,52 @@ def display_competitive_research_results(company_name, analysis_results, competi
     ])
     
     with tab1:
-        display_competitive_overview(company_name, analysis_results, competitors)
+        display_competitive_overview(company_name, analysis_results, competitors, competitor_data)
     
     with tab2:
-        display_pricing_comparison(analysis_results.get('pricing', ''))
+        display_pricing_comparison(analysis_results.get('pricing', ''), competitor_data)
     
     with tab3:
-        display_feature_comparison(analysis_results.get('features', ''))
+        display_feature_comparison(analysis_results.get('features', ''), competitor_data)
     
     with tab4:
-        display_swot_analysis(analysis_results.get('swot', ''))
+        display_swot_analysis(analysis_results.get('swot', ''), competitor_data)
     
     with tab5:
         display_export_options(company_name, analysis_results)
 
-def display_competitive_overview(company_name, analysis_results, competitors):
-    """Display competitive analysis of competitors in structured table format"""
-    st.subheader(f"🔍 Competitive Analysis: {company_name}'s Competitors")
+def display_competitive_overview(company_name, analysis_results, competitors, competitor_data):
+    """Display comprehensive competitive analysis with enhanced visualizations"""
+    st.subheader(f"🔍 Competitive Analysis: {company_name} vs Competitors")
     
-    # Display basic competitor info first
+    # Display competitor discovery summary
     st.subheader("🎯 Discovered Competitors & URLs")
+    
+    # Create a more visual competitor list
     for i, comp in enumerate(competitors, 1):
-        st.write(f"{i}. **{comp['name']}** - {comp['url']} (Source: {comp['source']})")
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col1:
+            st.markdown(f"**{i}.**")
+        with col2:
+            st.markdown(f"**[{comp['name']}]({comp['url']})**")
+        with col3:
+            st.markdown(f"*{comp['source']}*")
+    
+    # Add competitor summary metrics
+    st.subheader("📈 Competitive Landscape Summary")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Competitors", len(competitors))
+    with col2:
+        st.metric("Analysis Status", "✅ Complete" if analysis_results else "⏳ Processing")
+    with col3:
+        st.metric("Data Sources", len(set(comp['source'] for comp in competitors)))
+    with col4:
+        st.metric("Market Coverage", f"{len(competitors)} companies")
     
     # Create structured table data
-    st.subheader("📊 Competitive Analysis Table")
+    st.subheader("📊 Detailed Competitive Analysis Table")
     
     # Prepare table data
     table_data = []
@@ -650,7 +750,23 @@ def display_competitive_overview(company_name, analysis_results, competitors):
         except:
             pass
     
-    # Add competitors only (not the target company)
+    # Add target company first, then competitors
+    # Add target company
+    target_comp_data = None
+    if parsed_data:
+        target_comp_data = next((item for item in parsed_data if item.get('company_name', '').lower() == company_name.lower()), None)
+    
+    target_row = {
+        "Company": f"**{company_name}** (Target)",
+        "URL": "Target Company",
+        "Target Persona/Audience": target_comp_data.get('target_persona', 'Analyzing...') if target_comp_data else "Analyzing...",
+        "Market Positioning": target_comp_data.get('market_positioning', 'Analyzing...') if target_comp_data else "Analyzing...",
+        "Tone/Messaging": target_comp_data.get('tone_messaging', 'Analyzing...') if target_comp_data else "Analyzing...",
+        "Differentiation": target_comp_data.get('differentiation', 'Analyzing...') if target_comp_data else "Analyzing..."
+    }
+    table_data.append(target_row)
+    
+    # Add competitors
     for comp in competitors:
         comp_data = None
         if parsed_data:
@@ -691,33 +807,288 @@ def display_competitive_overview(company_name, analysis_results, competitors):
         st.markdown(structured_analysis)
     else:
         st.info("Running competitive analysis... This may take a moment.")
+    
+    # Add actual competitor data comparison
+    if competitor_data:
+        st.subheader("📊 Raw Competitor Data Comparison")
+        
+        # Create a simple comparison table with actual scraped data
+        comparison_data = []
+        for comp_name, comp_data in competitor_data.items():
+            homepage = comp_data.get('homepage', {})
+            row = {
+                "Company": f"**{comp_name}**",
+                "Title": homepage.get('title', 'N/A'),
+                "Headline": homepage.get('headline', 'N/A')[:100] + "..." if len(homepage.get('headline', '')) > 100 else homepage.get('headline', 'N/A'),
+                "Description": homepage.get('description', 'N/A')[:150] + "..." if len(homepage.get('description', '')) > 150 else homepage.get('description', 'N/A'),
+                "Features Count": len(homepage.get('features', [])),
+                "Has Pricing": "✅" if comp_data.get('pricing') else "❌",
+                "Has About": "✅" if comp_data.get('about') else "❌"
+            }
+            comparison_data.append(row)
+        
+        if comparison_data:
+            df_comparison = pd.DataFrame(comparison_data)
+            st.dataframe(df_comparison, use_container_width=True, hide_index=True)
 
-def display_pricing_comparison(pricing_text):
-    """Display pricing comparison"""
+def display_pricing_comparison(pricing_text, competitor_data):
+    """Display comprehensive pricing comparison with visual elements"""
     st.subheader("💰 Competitive Pricing Analysis")
     
     if pricing_text:
+        # Display the AI-generated pricing analysis
         st.markdown(pricing_text)
+        
+        # Add visual elements for better comparison
+        st.subheader("📊 Quick Pricing Overview")
+        
+        # Try to extract pricing data for visual comparison
+        if "PRICING COMPARISON TABLE" in pricing_text:
+            st.info("💡 Scroll up to see the detailed pricing comparison table above")
+        
+        # Add pricing insights
+        st.subheader("🔍 Key Pricing Insights")
+        st.markdown("""
+        - **Price Range Analysis**: Compare the pricing tiers across all competitors
+        - **Value Proposition**: Identify which company offers the best value for money
+        - **Market Positioning**: Understand how pricing positions each company
+        - **Competitive Advantages**: Spot pricing strategies that give companies an edge
+        """)
+    
+    # Add actual pricing data comparison
+    if competitor_data:
+        st.subheader("📊 Actual Pricing Data Comparison")
+        
+        pricing_comparison = []
+        for comp_name, comp_data in competitor_data.items():
+            pricing = comp_data.get('pricing', [])
+            if pricing:
+                for tier in pricing:
+                    pricing_comparison.append({
+                        "Company": comp_name,
+                        "Tier": tier.get('name', 'Unknown'),
+                        "Price": tier.get('price', 'N/A')
+                    })
+            else:
+                pricing_comparison.append({
+                    "Company": comp_name,
+                    "Tier": "No pricing found",
+                    "Price": "N/A"
+                })
+        
+        if pricing_comparison:
+            df_pricing = pd.DataFrame(pricing_comparison)
+            st.dataframe(df_pricing, use_container_width=True, hide_index=True)
+        else:
+            st.info("No pricing data available for comparison")
+        
     else:
-        st.info("Pricing analysis not available")
+        st.info("Pricing analysis not available - this may take a moment to generate")
 
-def display_feature_comparison(features_text):
-    """Display feature comparison"""
+def display_feature_comparison(features_text, competitor_data):
+    """Display comprehensive feature comparison with visual elements"""
     st.subheader("⚡ Competitive Feature Analysis")
     
     if features_text:
+        # Display the AI-generated feature analysis
         st.markdown(features_text)
+        
+        # Add visual elements for better comparison
+        st.subheader("🔍 Feature Comparison Insights")
+        
+        # Try to extract feature data for visual comparison
+        if "FEATURE COMPARISON TABLE" in features_text:
+            st.info("💡 Scroll up to see the detailed feature comparison table above")
+        
+        # Add feature analysis insights
+        st.subheader("📋 Key Feature Insights")
+        st.markdown("""
+        - **Feature Gaps**: Identify what features competitors have that others don't
+        - **Common Features**: See what features are standard across the industry
+        - **Unique Differentiators**: Discover what makes each company special
+        - **Feature Quality**: Compare the depth and breadth of feature sets
+        """)
+        
+        # Add feature categories explanation
+        st.subheader("📂 Feature Categories Explained")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Core Features:**
+            - Essential functionality
+            - Primary value propositions
+            - Must-have capabilities
+            """)
+            
+        with col2:
+            st.markdown("""
+            **Integration Features:**
+            - Third-party connections
+            - API capabilities
+            - Platform integrations
+            """)
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.markdown("""
+            **Target Market Features:**
+            - Industry-specific tools
+            - Role-based functionality
+            - Market segment focus
+            """)
+            
+        with col4:
+            st.markdown("""
+            **Unique Features:**
+            - Proprietary capabilities
+            - Competitive differentiators
+            - Innovation highlights
+            """)
+    
+    # Add actual feature data comparison
+    if competitor_data:
+        st.subheader("📊 Actual Feature Data Comparison")
+        
+        feature_comparison = []
+        for comp_name, comp_data in competitor_data.items():
+            homepage = comp_data.get('homepage', {})
+            features = homepage.get('features', [])
+            additional_features = comp_data.get('features', [])
+            
+            all_features = features + (additional_features if additional_features else [])
+            
+            feature_comparison.append({
+                "Company": comp_name,
+                "Total Features": len(all_features),
+                "Homepage Features": len(features),
+                "Additional Features": len(additional_features) if additional_features else 0,
+                "Sample Features": ", ".join(all_features[:5]) if all_features else "No features found"
+            })
+        
+        if feature_comparison:
+            df_features = pd.DataFrame(feature_comparison)
+            st.dataframe(df_features, use_container_width=True, hide_index=True)
+            
+            # Show detailed features for each company
+            st.subheader("🔍 Detailed Features by Company")
+            for comp_name, comp_data in competitor_data.items():
+                with st.expander(f"View all features for {comp_name}"):
+                    homepage = comp_data.get('homepage', {})
+                    features = homepage.get('features', [])
+                    additional_features = comp_data.get('features', [])
+                    
+                    if features:
+                        st.write("**Homepage Features:**")
+                        for feature in features:
+                            st.write(f"• {feature}")
+                    
+                    if additional_features:
+                        st.write("**Additional Features:**")
+                        for feature in additional_features:
+                            st.write(f"• {feature}")
+                    
+                    if not features and not additional_features:
+                        st.write("No features found for this company")
+        else:
+            st.info("No feature data available for comparison")
+        
     else:
-        st.info("Feature analysis not available")
+        st.info("Feature analysis not available - this may take a moment to generate")
 
-def display_swot_analysis(swot_text):
-    """Display SWOT analysis"""
+def display_swot_analysis(swot_text, competitor_data):
+    """Display comprehensive competitive SWOT analysis with visual elements"""
     st.subheader("🎯 Competitive SWOT Analysis")
     
     if swot_text:
+        # Display the AI-generated SWOT analysis
         st.markdown(swot_text)
+        
+        # Add visual elements for better comparison
+        st.subheader("📊 SWOT Comparison Matrix")
+        
+        # Try to extract SWOT data for visual comparison
+        if "COMPETITIVE SWOT MATRIX" in swot_text:
+            st.info("💡 Scroll up to see the detailed SWOT comparison matrix above")
+        
+        # Add SWOT insights
+        st.subheader("🔍 Key Strategic Insights")
+        st.markdown("""
+        - **Market Leader Analysis**: Which company has the strongest overall position?
+        - **Threat Assessment**: Which company poses the greatest competitive threat?
+        - **Growth Opportunities**: Which company has the best growth potential?
+        - **Vulnerability Analysis**: Which company has the most weaknesses to address?
+        - **Strategic Recommendations**: What should each company focus on for competitive advantage?
+        """)
+        
+        # Add SWOT explanation
+        st.subheader("📋 Understanding SWOT Analysis")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **Strengths (Internal + Positive):**
+            - What does the company do well?
+            - What unique resources do they have?
+            - What advantages do they have over competitors?
+            """)
+            
+        with col2:
+            st.markdown("""
+            **Weaknesses (Internal + Negative):**
+            - What could the company improve?
+            - What resources are they lacking?
+            - What puts them at a disadvantage?
+            """)
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.markdown("""
+            **Opportunities (External + Positive):**
+            - What trends could benefit the company?
+            - What market gaps could they fill?
+            - What partnerships could they form?
+            """)
+            
+        with col4:
+            st.markdown("""
+            **Threats (External + Negative):**
+            - What competitors are doing well?
+            - What market changes could hurt them?
+            - What external factors pose risks?
+            """)
+    
+    # Add actual competitor data for SWOT context
+    if competitor_data:
+        st.subheader("📊 Competitor Data for SWOT Context")
+        
+        swot_context = []
+        for comp_name, comp_data in competitor_data.items():
+            homepage = comp_data.get('homepage', {})
+            about = comp_data.get('about', {})
+            
+            swot_context.append({
+                "Company": comp_name,
+                "Title": homepage.get('title', 'N/A'),
+                "Headline": homepage.get('headline', 'N/A')[:100] + "..." if len(homepage.get('headline', '')) > 100 else homepage.get('headline', 'N/A'),
+                "Description": homepage.get('description', 'N/A')[:150] + "..." if len(homepage.get('description', '')) > 150 else homepage.get('description', 'N/A'),
+                "Mission": about.get('mission', 'N/A')[:100] + "..." if len(about.get('mission', '')) > 100 else about.get('mission', 'N/A'),
+                "Features Count": len(homepage.get('features', [])),
+                "Has Pricing": "✅" if comp_data.get('pricing') else "❌"
+            })
+        
+        if swot_context:
+            df_swot = pd.DataFrame(swot_context)
+            st.dataframe(df_swot, use_container_width=True, hide_index=True)
+            
+            st.info("💡 Use this data above to understand each company's strengths and weaknesses for SWOT analysis")
+        else:
+            st.info("No competitor data available for SWOT context")
+        
     else:
-        st.info("SWOT analysis not available")
+        st.info("SWOT analysis not available - this may take a moment to generate")
 
 def display_export_options(company_name, analysis_results):
     """Display export options"""
